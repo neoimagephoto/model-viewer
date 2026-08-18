@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D 模型高級互動</title>
+    <style>
+        /* 滿版網頁設定 */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1a1a1a; /* 改為深色背景，讓燈光質感更好 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        /* 3D 畫布 */
+        model-viewer {
+            width: 100%;
+            height: 100%;
+            background-color: #1a1a1a;
+        }
+
+        /* 控制介面容器 */
+        .controls-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        /* 按鈕基本樣式 (適合 iPhone 手指點擊的尺寸) */
+        .btn {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px); /* 蘋果風毛玻璃效果 */
+            -webkit-backdrop-filter: blur(10px);
+            border: none;
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #333;
+            border-radius: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            -webkit-tap-highlight-color: transparent; /* 移除 iPhone 點擊藍色陰影 */
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 1);
+        }
+
+        /* 頂部指示文字 */
+        .instruction {
+            position: absolute;
+            top: 25px;
+            width: 100%;
+            text-align: center;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            pointer-events: none;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            letter-spacing: 1px;
+        }
+    </style>
+    <!-- 引入 Google model-viewer 核心元件 -->
+    <script type="module" src="https://googleapis.com"></script>
+</head>
+<body>
+
+    <div class="instruction">👆 觸控可旋轉放大模型 👆</div>
+
+    <!-- 3D 模型核心元件 -->
+    <!-- environment-image="neutral" 與 exposure="1.2"：提供高品質環境光與中性攝影棚照相效果 -->
+    <!-- shadow-intensity="1.5" shadow-softness="0.5"：開啟柔和真實的陰影 -->
+    <!-- ar ar-modes="webxr scene-viewer quick-look"：開啟 iPhone AR 模式支援 -->
+    <model-viewer 
+        id="myModel"
+        src="JY-001.glb" 
+        alt="Blender 3D Model" 
+        camera-controls 
+        touch-action="pan-y"
+        environment-image="neutral"
+        exposure="1.2"
+        shadow-intensity="1.5"
+        shadow-softness="0.5"
+        ar
+        ar-modes="webxr scene-viewer quick-look"
+        interaction-prompt="none">
+    </model-viewer>
+
+    <!-- 按鈕控制區 -->
+    <div class="controls-container">
+        <!-- 自動旋轉切換按鈕 -->
+        <button class="btn" id="rotateBtn">▶ 自動旋轉</button>
+    </div>
+
+    <script>
+        const modelViewer = document.querySelector("#myModel");
+        const rotateBtn = document.querySelector("#rotateBtn");
+        
+        // 初始化狀態：預設不自動旋轉
+        let isRotating = false;
+
+        // 監聽按鈕點擊事件
+        rotateBtn.addEventListener("click", () => {
+            isRotating = !isRotating;
+            
+            if (isRotating) {
+                modelViewer.autoRotate = true;
+                modelViewer.rotationSpeed = "30deg"; // 調整旋轉速度 (正數順時針，負數逆時針)
+                rotateBtn.innerHTML = "⏸ 停止旋轉";
+                rotateBtn.style.background = "#007AFF"; // 變成 Apple 經典藍色
+                rotateBtn.style.color = "#fff";
+            } else {
+                modelViewer.autoRotate = false;
+                rotateBtn.innerHTML = "▶ 自動旋轉";
+                rotateBtn.style.background = "rgba(255, 255, 255, 0.85)";
+                rotateBtn.style.color = "#333";
+            }
+        });
+    </script>
+
+</body>
+</html>
+
