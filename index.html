@@ -1,135 +1,298 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" class="h-full w-full overflow-hidden">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D 模型高級互動</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>iPhone 3D AR 攝影棚檢視器</title>
+    
+    <!-- 載入 Tailwind CSS (方便進行響應式與 iOS 風格排版) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 載入 Google <model-viewer> 核心元件 (專利 3D / AR 檢視器) -->
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+
     <style>
-        /* 滿版網頁設定 */
-        body, html {
+        /* 針對 iPhone Safari 優化：防止網頁頁面橡皮筋回彈與捲動 */
+        html, body {
+            height: 100dvh;
+            width: 100vw;
             margin: 0;
             padding: 0;
-            width: 100%;
-            height: 100%;
             overflow: hidden;
-            background-color: #1a1a1a; /* 改為深色背景，讓燈光質感更好 */
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+            background-color: #0b0c10;
+            color: #ffffff;
         }
 
-        /* 3D 畫布 */
-        model-viewer {
-            width: 100%;
-            height: 100%;
-            background-color: #1a1a1a;
+        /* iOS 特有 Safe Area (瀏海區與底部 Home Bar 避讓) */
+        .safe-pb {
+            padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
+        }
+        .safe-pt {
+            padding-top: calc(1rem + env(safe-area-inset-top));
         }
 
-        /* 控制介面容器 */
-        .controls-container {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 15px;
-            z-index: 10;
+        /* iOS Modern Glassmorphism (半透明玻璃效果) */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
 
-        /* 按鈕基本樣式 (適合 iPhone 手指點擊的尺寸) */
-        .btn {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(10px); /* 蘋果風毛玻璃效果 */
-            -webkit-backdrop-filter: blur(10px);
-            border: none;
-            padding: 12px 24px;
-            font-size: 15px;
-            font-weight: 600;
-            color: #333;
-            border-radius: 25px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            -webkit-tap-highlight-color: transparent; /* 移除 iPhone 點擊藍色陰影 */
+        .glass-button {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
         }
 
-        .btn:active {
-            transform: scale(0.95);
-            background: rgba(255, 255, 255, 1);
+        .glass-button:active {
+            transform: scale(0.92);
+            background: rgba(255, 255, 255, 0.3);
         }
 
-        /* 頂部指示文字 */
-        .instruction {
-            position: absolute;
-            top: 25px;
-            width: 100%;
-            text-align: center;
-            font-size: 14px;
-            color: rgba(255, 255, 255, 0.7);
+        .glass-button.active {
+            background: rgba(255, 255, 255, 0.9);
+            color: #000000;
+            border-color: rgba(255, 255, 255, 1);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+        }
+
+        /* AR 按鈕專用 iOS 耀眼亮藍風格 */
+        .ar-button-style {
+            background: linear-gradient(135deg, rgba(0, 122, 255, 0.85), rgba(88, 86, 214, 0.85));
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 20px rgba(0, 122, 255, 0.4);
+        }
+
+        .ar-button-style:active {
+            transform: scale(0.94);
+            opacity: 0.9;
+        }
+
+        /* 隱藏 model-viewer 預設的 AR 按鈕原生圖示樣式 */
+        model-viewer::part(default-ar-button) {
+            display: none;
+        }
+
+        /* 淡入淡出動畫 */
+        .fade-out {
+            opacity: 0;
             pointer-events: none;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-            letter-spacing: 1px;
+            transition: opacity 0.6s ease-out;
         }
     </style>
-    <!-- 引入 Google model-viewer 核心元件 -->
-    <script type="module" src="https://googleapis.com"></script>
 </head>
-<body>
+<body class="relative w-full h-full select-none bg-radial from-slate-900 to-black">
 
-    <div class="instruction">👆 觸控可旋轉放大模型 👆</div>
-
-    <!-- 3D 模型核心元件 -->
-    <!-- environment-image="neutral" 與 exposure="1.2"：提供高品質環境光與中性攝影棚照相效果 -->
-    <!-- shadow-intensity="1.5" shadow-softness="0.5"：開啟柔和真實的陰影 -->
-    <!-- ar ar-modes="webxr scene-viewer quick-look"：開啟 iPhone AR 模式支援 -->
+    <!-- 
+      Google <model-viewer> 核心屬性說明：
+      - src: 指向模型路徑 ("model.glb")
+      - ar: 啟用 AR 功能
+      - ar-modes: 優先使用 iOS Quick Look (Apple Native AR)
+      - camera-controls: 允許單指旋轉、雙指平移與縮放
+      - auto-rotate: 啟用旋轉
+      - auto-rotate-delay: 手指觸控停止後自動恢復旋轉的延遲毫秒數 (2000ms = 2秒)
+      - rotation-per-second: 自動旋轉速度 (例如: 25deg/s 慢速質感旋轉)
+      - exposure / shadow-intensity / shadow-softness: 高質感 Studio 攝影棚燈光參數
+      - environment-image: neutral (自然色溫 studio 光源)
+      - tone-mapping: commerce (顯色度高、對比度佳的商業照相館風格)
+    -->
     <model-viewer 
-        id="myModel"
-        src="JY-001.glb" 
-        alt="Blender 3D Model" 
-        camera-controls 
-        touch-action="pan-y"
-        environment-image="neutral"
-        exposure="1.2"
-        shadow-intensity="1.5"
-        shadow-softness="0.5"
+        id="studio-viewer"
+        src="model.glb"
         ar
-        ar-modes="webxr scene-viewer quick-look"
-        interaction-prompt="none">
+        ar-modes="quicklook scene-viewer webxr"
+        camera-controls
+        touch-action="none"
+        auto-rotate
+        auto-rotate-delay="2000"
+        rotation-per-second="25deg"
+        shadow-intensity="1.5"
+        shadow-softness="0.8"
+        exposure="1.2"
+        environment-image="neutral"
+        tone-mapping="commerce"
+        interaction-prompt="none"
+        class="w-full h-full block cursor-grab active:cursor-grabbing">
+        
+        <!-- 自訂 iOS AR 原生啟動按鈕 Slot -->
+        <button slot="ar-button" id="custom-ar-btn" class="hidden">
+            AR Mode
+        </button>
     </model-viewer>
 
-    <!-- 按鈕控制區 -->
-    <div class="controls-container">
-        <!-- 自動旋轉切換按鈕 -->
-        <button class="btn" id="rotateBtn">▶ 自動旋轉</button>
+    <!-- 1. 頂部標題列 (iOS 擬物風格) -->
+    <header class="absolute top-0 left-0 right-0 z-20 safe-pt px-5 flex justify-between items-center pointer-events-none">
+        <div class="glass-panel px-4 py-2 rounded-full flex items-center gap-2.5 pointer-events-auto">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-xs font-semibold tracking-wider uppercase text-white/90">Studio 3D Pro</span>
+        </div>
+        
+        <!-- 狀態提示標籤 (例如：旋轉中/使用者控制中) -->
+        <div id="status-badge" class="glass-panel px-3 py-1.5 rounded-full text-xs text-white/70 pointer-events-auto transition-opacity duration-300">
+            攝影棚模式
+        </div>
+    </header>
+
+    <!-- 2. 優雅的 Loading 載入進度條畫面 (模型載入完成後會淡出隱藏) -->
+    <div id="loading-overlay" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md transition-opacity duration-500">
+        <div class="flex flex-col items-center max-w-xs w-full px-6 text-center">
+            <!-- Apple 風格載入 Spinner -->
+            <div class="w-12 h-12 mb-5 relative">
+                <div class="w-12 h-12 rounded-full border-2 border-white/10 border-t-blue-500 animate-spin"></div>
+            </div>
+            
+            <h2 class="text-lg font-medium text-white mb-1">載入 3D 攝影棚</h2>
+            <p id="loading-text" class="text-xs text-white/50 mb-4">正在最佳化燈光與材質...</p>
+            
+            <!-- 進度條外框與內條 -->
+            <div class="w-full bg-white/10 h-1.5 rounded-full overflow-hidden backdrop-blur-sm">
+                <div id="progress-bar" class="bg-gradient-to-r from-blue-500 to-indigo-400 h-full w-0 transition-all duration-200 ease-out rounded-full"></div>
+            </div>
+            <span id="progress-percent" class="text-[10px] text-white/40 mt-2 font-mono">0%</span>
+        </div>
     </div>
 
-    <script>
-        const modelViewer = document.querySelector("#myModel");
-        const rotateBtn = document.querySelector("#rotateBtn");
+    <!-- 3. 底部懸浮控制列 (iOS 浮動工具列) -->
+    <footer class="absolute bottom-0 left-0 right-0 z-20 safe-pb px-4 flex flex-col items-center gap-3 pointer-events-none">
         
-        // 初始化狀態：預設不自動旋轉
-        let isRotating = false;
+        <div class="glass-panel p-2 rounded-3xl flex items-center gap-2 pointer-events-auto shadow-2xl">
+            <!-- 自動旋轉開關按鈕 -->
+            <button id="toggle-rotate-btn" class="glass-button active h-12 px-4 rounded-2xl flex items-center gap-2 text-xs font-medium">
+                <svg id="rotate-icon" class="w-4 h-4 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <span id="rotate-btn-text">自動旋轉：開</span>
+            </button>
 
-        // 監聽按鈕點擊事件
-        rotateBtn.addEventListener("click", () => {
-            isRotating = !isRotating;
-            
-            if (isRotating) {
-                modelViewer.autoRotate = true;
-                modelViewer.rotationSpeed = "30deg"; // 調整旋轉速度 (正數順時針，負數逆時針)
-                rotateBtn.innerHTML = "⏸ 停止旋轉";
-                rotateBtn.style.background = "#007AFF"; // 變成 Apple 經典藍色
-                rotateBtn.style.color = "#fff";
-            } else {
-                modelViewer.autoRotate = false;
-                rotateBtn.innerHTML = "▶ 自動旋轉";
-                rotateBtn.style.background = "rgba(255, 255, 255, 0.85)";
-                rotateBtn.style.color = "#333";
+            <!-- 重設視角按鈕 -->
+            <button id="reset-view-btn" class="glass-button h-12 w-12 rounded-2xl flex items-center justify-center text-white/80" title="重設視角">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
+            </button>
+
+            <!-- iPhone Apple AR Quick Look 觸發按鈕 -->
+            <button id="trigger-ar-btn" class="ar-button-style h-12 px-5 rounded-2xl flex items-center gap-2 text-xs font-semibold text-white">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M3 4c0-1.1.9-2 2-2h4v2H5v4H3V4zm14-2h4c1.1 0 2 .9 2 2v4h-2V4h-4V2zM3 16h2v4h4v2H5c-1.1 0-2-.9-2-2v-4zm18 0v4c0 1.1-.9 2-2 2h-4v-2h4v-4h2zM12 6l5.5 3.18v6.36L12 18.73l-5.5-3.19V9.18L12 6z"/>
+                </svg>
+                <span>AR 實境檢視</span>
+            </button>
+        </div>
+
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            /* 取得 DOM 元素 */
+            const modelViewer = document.getElementById('studio-viewer');
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const progressBar = document.getElementById('progress-bar');
+            const progressPercent = document.getElementById('progress-percent');
+            const toggleRotateBtn = document.getElementById('toggle-rotate-btn');
+            const rotateBtnText = document.getElementById('rotate-btn-text');
+            const rotateIcon = document.getElementById('rotate-icon');
+            const resetViewBtn = document.getElementById('reset-view-btn');
+            const triggerArBtn = document.getElementById('trigger-ar-btn');
+            const customArBtn = document.getElementById('custom-ar-btn');
+            const statusBadge = document.getElementById('status-badge');
+
+            // 狀態變數：紀錄使用者設定的自動旋轉偏好
+            let isAutoRotateEnabled = true;
+
+            /* 1. 模型載入進度處理 (Progress Event) */
+            modelViewer.addEventListener('progress', (event) => {
+                const progress = event.detail.totalProgress;
+                const percent = Math.round(progress * 100);
+                
+                progressBar.style.width = `${percent}%`;
+                progressPercent.textContent = `${percent}%`;
+
+                // 載入完成，將 Loading 畫面淡出隱藏
+                if (progress === 1) {
+                    setTimeout(() => {
+                        loadingOverlay.classList.add('fade-out');
+                        setTimeout(() => {
+                            loadingOverlay.style.display = 'none';
+                        }, 600);
+                    }, 300);
+                }
+            });
+
+            /* 2. 切換自動旋轉 (Auto-Rotate Toggle) */
+            function updateRotateUI(enabled) {
+                if (enabled) {
+                    modelViewer.autoRotate = true;
+                    toggleRotateBtn.classList.add('active');
+                    rotateBtnText.textContent = '自動旋轉：開';
+                    rotateIcon.classList.add('animate-spin');
+                    rotateIcon.style.animationDuration = '8s';
+                } else {
+                    modelViewer.autoRotate = false;
+                    toggleRotateBtn.classList.remove('active');
+                    rotateBtnText.textContent = '自動旋轉：關';
+                    rotateIcon.classList.remove('animate-spin');
+                }
             }
+
+            toggleRotateBtn.addEventListener('click', () => {
+                isAutoRotateEnabled = !isAutoRotateEnabled;
+                updateRotateUI(isAutoRotateEnabled);
+            });
+
+            /* 3. 手指觸控時暫停自動旋轉 / 離開後自動恢復 */
+            // 當使用者觸控操作模型時 (camera-change & user interaction)
+            modelViewer.addEventListener('camera-change', (event) => {
+                if (event.detail.source === 'user-interaction') {
+                    statusBadge.textContent = '手勢操作中...';
+                    statusBadge.classList.add('bg-white/20', 'text-white');
+                }
+            });
+
+            // 手指離開螢幕，恢復偏好的自動旋轉模式
+            const handleTouchEnd = () => {
+                setTimeout(() => {
+                    statusBadge.textContent = '攝影棚模式';
+                    statusBadge.classList.remove('bg-white/20', 'text-white');
+                }, 1000);
+            };
+
+            modelViewer.addEventListener('touchend', handleTouchEnd);
+            modelViewer.addEventListener('mouseup', handleTouchEnd);
+
+            /* 4. 重設攝影機視角 */
+            resetViewBtn.addEventListener('click', () => {
+                modelViewer.cameraOrbit = '0deg 75deg 105%';
+                modelViewer.fieldOfView = 'auto';
+                modelViewer.jumpToGoal();
+            });
+
+            /* 5. 觸發 iPhone Apple AR Quick Look */
+            triggerArBtn.addEventListener('click', () => {
+                // 呼叫 model-viewer 的 activateAR 方法或點擊隱藏的 slot 觸發器
+                if (modelViewer.canActivateAR) {
+                    modelViewer.activateAR();
+                } else {
+                    // 若是在非 iOS / 無 AR 支援的環境下提示
+                    customArBtn.click();
+                }
+            });
+
+            /* 初始化狀態 */
+            updateRotateUI(true);
         });
     </script>
-
 </body>
 </html>
-
