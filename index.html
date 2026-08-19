@@ -1,248 +1,366 @@
 <!DOCTYPE html>
-<html lang="zh-TW" class="h-full w-full overflow-hidden">
+<html lang="zh-TW" class="h-full bg-slate-950 text-slate-100 font-sans antialiased">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>iPhone 3D AR 攝影棚檢視器</title>
-    
-    <!-- 載入 Tailwind CSS (方便進行響應式與 iOS 風格排版) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iPhone 3D AR</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- 載入 Google <model-viewer> 核心元件 (專利 3D / AR 檢視器) -->
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* 針對 iPhone Safari 優化：防止網頁頁面橡皮筋回彈與捲動 */
-        html, body {
-            height: 100dvh;
-            width: 100vw;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            touch-action: none;
-            -webkit-user-select: none;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
-            background-color: #0b0c10;
-            color: #ffffff;
-        }
-
-        /* iOS 特有 Safe Area (瀏海區與底部 Home Bar 避讓) */
-        .safe-pb {
-            padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
-        }
-        .safe-pt {
-            padding-top: calc(1rem + env(safe-area-inset-top));
-        }
-
-        /* iOS Modern Glassmorphism (半透明玻璃效果) */
         .glass-panel {
-            background: rgba(255, 255, 255, 0.12);
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            background: rgba(18, 24, 38, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
         }
-
-        .glass-button {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
-        }
-
-        .glass-button:active {
-            transform: scale(0.92);
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .glass-button.active {
-            background: rgba(255, 255, 255, 0.9);
-            color: #000000;
-            border-color: rgba(255, 255, 255, 1);
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
-        }
-
-        /* AR 按鈕專用 iOS 耀眼亮藍風格 */
-        .ar-button-style {
-            background: linear-gradient(135deg, rgba(0, 122, 255, 0.85), rgba(88, 86, 214, 0.85));
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 4px 20px rgba(0, 122, 255, 0.4);
-        }
-
-        .ar-button-style:active {
-            transform: scale(0.94);
-            opacity: 0.9;
-        }
-
-        /* 隱藏 model-viewer 預設的 AR 按鈕原生圖示樣式 */
-        model-viewer::part(default-ar-button) {
-            display: none;
-        }
-
-        /* 淡入淡出動畫 */
         .fade-out {
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.6s ease-out;
+            transition: opacity 0.5s ease-out;
+        }
+        model-viewer {
+            width: 100%;
+            height: 100%;
+            --poster-color: transparent;
         }
     </style>
 </head>
-<body class="relative w-full h-full select-none bg-radial from-slate-900 to-black">
+<body class="h-full overflow-hidden flex flex-col justify-between relative bg-gradient-to-b from-slate-900 via-slate-950 to-black select-none">
 
-    <!-- 
-      Google <model-viewer> 核心屬性說明：
-      - src: 指向模型路徑 ("model.glb")
-      - ar: 啟用 AR 功能
-      - ar-modes: 優先使用 iOS Quick Look (Apple Native AR)
-      - camera-controls: 允許單指旋轉、雙指平移與縮放
-      - auto-rotate: 啟用旋轉
-      - auto-rotate-delay: 手指觸控停止後自動恢復旋轉的延遲毫秒數 (2000ms = 2秒)
-      - rotation-per-second: 自動旋轉速度 (例如: 25deg/s 慢速質感旋轉)
-      - exposure / shadow-intensity / shadow-softness: 高質感 Studio 攝影棚燈光參數
-      - environment-image: neutral (自然色溫 studio 光源)
-      - tone-mapping: commerce (顯色度高、對比度佳的商業照相館風格)
-    -->
-    <model-viewer 
-        id="studio-viewer"
-        src="model.glb"
-        ar
-        ar-modes="quicklook scene-viewer webxr"
-        camera-controls
-        touch-action="none"
-        auto-rotate
-        auto-rotate-delay="2000"
-        rotation-per-second="25deg"
-        shadow-intensity="1.5"
-        shadow-softness="0.8"
-        exposure="1.2"
-        environment-image="neutral"
-        tone-mapping="commerce"
-        interaction-prompt="none"
-        class="w-full h-full block cursor-grab active:cursor-grabbing">
-        
-        <!-- 自訂 iOS AR 原生啟動按鈕 Slot -->
-        <button slot="ar-button" id="custom-ar-btn" class="hidden">
-            AR Mode
-        </button>
-    </model-viewer>
-
-    <!-- 1. 頂部標題列 (iOS 擬物風格) -->
-    <header class="absolute top-0 left-0 right-0 z-20 safe-pt px-5 flex justify-between items-center pointer-events-none">
-        <div class="glass-panel px-4 py-2 rounded-full flex items-center gap-2.5 pointer-events-auto">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span class="text-xs font-semibold tracking-wider uppercase text-white/90">Studio 3D Pro</span>
+    <!-- 頂部列 Header -->
+    <header class="absolute top-0 left-0 right-0 z-40 p-4 flex items-center justify-between pointer-events-none">
+        <div class="flex items-center space-x-3 pointer-events-auto">
+            <div class="glass-panel px-3 py-1.5 rounded-full flex items-center space-x-2 text-xs font-medium text-slate-200">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span id="status-badge">攝影棚模式</span>
+            </div>
+            <div id="model-info-badge" class="hidden sm:flex glass-panel px-3 py-1.5 rounded-full items-center space-x-2 text-xs font-medium text-blue-400">
+                <i class="fa-solid fa-cube text-blue-400"></i>
+                <span id="model-name-text">Text.glb (Blender)</span>
+            </div>
         </div>
-        
-        <!-- 狀態提示標籤 (例如：旋轉中/使用者控制中) -->
-        <div id="status-badge" class="glass-panel px-3 py-1.5 rounded-full text-xs text-white/70 pointer-events-auto transition-opacity duration-300">
-            攝影棚模式
+
+        <div class="flex items-center space-x-2 pointer-events-auto">
+            <!-- 檔案上傳按鈕 -->
+            <label class="glass-panel px-3 py-2 rounded-xl text-xs font-medium text-white hover:bg-white/20 active:scale-95 transition cursor-pointer flex items-center space-x-2">
+                <i class="fa-solid fa-file-arrow-up text-blue-400"></i>
+                <span>載入 GLB 模型</span>
+                <input type="file" id="glb-file-input" accept=".glb,.gltf" class="hidden">
+            </label>
+            <!-- 資訊面板切換按鈕 -->
+            <button id="toggle-info-btn" class="glass-panel w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/20 active:scale-95 transition">
+                <i class="fa-solid fa-circle-info text-sm"></i>
+            </button>
         </div>
     </header>
 
-    <!-- 2. 優雅的 Loading 載入進度條畫面 (模型載入完成後會淡出隱藏) -->
-    <div id="loading-overlay" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md transition-opacity duration-500">
-        <div class="flex flex-col items-center max-w-xs w-full px-6 text-center">
-            <!-- Apple 風格載入 Spinner -->
-            <div class="w-12 h-12 mb-5 relative">
-                <div class="w-12 h-12 rounded-full border-2 border-white/10 border-t-blue-500 animate-spin"></div>
-            </div>
-            
-            <h2 class="text-lg font-medium text-white mb-1">載入 3D 攝影棚</h2>
-            <p id="loading-text" class="text-xs text-white/50 mb-4">正在最佳化燈光與材質...</p>
-            
-            <!-- 進度條外框與內條 -->
-            <div class="w-full bg-white/10 h-1.5 rounded-full overflow-hidden backdrop-blur-sm">
-                <div id="progress-bar" class="bg-gradient-to-r from-blue-500 to-indigo-400 h-full w-0 transition-all duration-200 ease-out rounded-full"></div>
-            </div>
-            <span id="progress-percent" class="text-[10px] text-white/40 mt-2 font-mono">0%</span>
-        </div>
-    </div>
-
-    <!-- 3. 底部懸浮控制列 (iOS 浮動工具列) -->
-    <footer class="absolute bottom-0 left-0 right-0 z-20 safe-pb px-4 flex flex-col items-center gap-3 pointer-events-none">
+    <!-- 主 3D 視窗與拖曳上傳區域 -->
+    <main id="drop-zone" class="relative w-full h-full flex-1 flex items-center justify-center overflow-hidden">
         
-        <div class="glass-panel p-2 rounded-3xl flex items-center gap-2 pointer-events-auto shadow-2xl">
-            <!-- 自動旋轉開關按鈕 -->
-            <button id="toggle-rotate-btn" class="glass-button active h-12 px-4 rounded-2xl flex items-center gap-2 text-xs font-medium">
-                <svg id="rotate-icon" class="w-4 h-4 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                </svg>
-                <span id="rotate-btn-text">自動旋轉：開</span>
-            </button>
-
-            <!-- 重設視角按鈕 -->
-            <button id="reset-view-btn" class="glass-button h-12 w-12 rounded-2xl flex items-center justify-center text-white/80" title="重設視角">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                </svg>
-            </button>
-
-            <!-- iPhone Apple AR Quick Look 觸發按鈕 -->
-            <button id="trigger-ar-btn" class="ar-button-style h-12 px-5 rounded-2xl flex items-center gap-2 text-xs font-semibold text-white">
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M3 4c0-1.1.9-2 2-2h4v2H5v4H3V4zm14-2h4c1.1 0 2 .9 2 2v4h-2V4h-4V2zM3 16h2v4h4v2H5c-1.1 0-2-.9-2-2v-4zm18 0v4c0 1.1-.9 2-2 2h-4v-2h4v-4h2zM12 6l5.5 3.18v6.36L12 18.73l-5.5-3.19V9.18L12 6z"/>
-                </svg>
-                <span>AR 實境檢視</span>
-            </button>
+        <!-- 拖曳檔案覆蓋提示 Overlay -->
+        <div id="drag-overlay" class="absolute inset-0 z-30 bg-blue-600/30 backdrop-blur-sm border-4 border-dashed border-blue-400 flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+            <i class="fa-solid fa-cloud-arrow-up text-5xl text-white mb-3 animate-bounce"></i>
+            <p class="text-lg font-bold text-white">放開滑鼠以載入 3D GLB 模型</p>
+            <p class="text-xs text-blue-200 mt-1">支援 .glb 與 .gltf 格式</p>
         </div>
 
+        <!-- Google <model-viewer> 3D 模型元件 -->
+        <model-viewer
+            id="3d-viewer"
+            src="https://modelviewer.dev/shared-assets/models/Astronaut.glb"
+            alt="3D AR Model Studio"
+            ar
+            ar-modes="webxr scene-viewer quick-look"
+            camera-controls
+            auto-rotate
+            shadow-intensity="1.5"
+            shadow-softness="0.8"
+            exposure="1.1"
+            environment-image="neutral"
+            interaction-prompt="auto">
+            
+            <button slot="ar-button" id="custom-ar-btn" class="hidden"></button>
+        </model-viewer>
+
+        <!-- 右側 Inspector 資訊彈窗 -->
+        <aside id="info-panel" class="absolute top-16 right-4 z-40 w-80 glass-panel rounded-2xl p-4 shadow-2xl transition-all duration-300 transform translate-x-96 opacity-0 pointer-events-none">
+            <div class="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
+                <h3 class="text-sm font-semibold text-white flex items-center space-x-2">
+                    <i class="fa-solid fa-microchip text-indigo-400"></i>
+                    <span>glTF 模型詳細資訊</span>
+                </h3>
+                <button id="close-info-btn" class="text-slate-400 hover:text-white text-xs">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <div class="space-y-2.5 text-xs">
+                <div class="flex justify-between py-1 border-b border-white/5">
+                    <span class="text-slate-400">產生器 (Generator):</span>
+                    <span id="meta-generator" class="font-mono text-slate-200 truncate max-w-[140px]" title="Khronos glTF Blender I/O">Blender v5.2.39</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                    <span class="text-slate-400">網格名稱 (Node):</span>
+                    <span id="meta-node" class="font-mono text-amber-400 font-semibold">Text</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                    <span class="text-slate-400">材質雙面 (Double Sided):</span>
+                    <span id="meta-doublesided" class="font-mono text-emerald-400">True (雙面繪製)</span>
+                </div>
+
+                <!-- 材質即時微調 Slider Controls -->
+                <div class="pt-2">
+                    <p class="text-slate-300 font-medium mb-2 flex items-center space-x-1">
+                        <i class="fa-solid fa-palette text-amber-400"></i>
+                        <span>材質即時調整</span>
+                    </p>
+                    <div class="space-y-2 bg-black/30 p-2.5 rounded-xl border border-white/5">
+                        <div>
+                            <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                                <span>基礎顏色 (Base Color)</span>
+                                <input type="color" id="mat-color" value="#ff9a00" class="w-5 h-5 rounded cursor-pointer border-none bg-transparent">
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                                <span>粗糙度 (Roughness)</span>
+                                <span id="roughness-val" class="font-mono text-slate-200">0.5</span>
+                            </div>
+                            <input type="range" id="mat-roughness" min="0" max="1" step="0.05" value="0.5" class="w-full accent-blue-500">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                                <span>金屬感 (Metallic)</span>
+                                <span id="metallic-val" class="font-mono text-slate-200">0.0</span>
+                            </div>
+                            <input type="range" id="mat-metallic" min="0" max="1" step="0.05" value="0" class="w-full accent-blue-500">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Loading 載入進度畫面 -->
+        <div id="loading-overlay" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md transition-opacity duration-500">
+            <div class="flex flex-col items-center max-w-xs w-full px-6 text-center">
+                <div class="w-12 h-12 mb-5 relative">
+                    <div class="w-12 h-12 rounded-full border-2 border-white/10 border-t-blue-500 animate-spin"></div>
+                </div>
+                <h2 class="text-lg font-medium text-white mb-1">載入 3D 攝影棚</h2>
+                <p id="loading-text" class="text-xs text-white/50 mb-4">正在渲染 3D 幾何結構...</p>
+                <div class="w-full bg-white/10 h-1.5 rounded-full overflow-hidden backdrop-blur-sm">
+                    <div id="progress-bar" class="bg-gradient-to-r from-blue-500 to-indigo-400 h-full w-0 transition-all duration-200 ease-out rounded-full"></div>
+                </div>
+                <span id="progress-percent" class="text-[10px] text-white/40 mt-2 font-mono">0%</span>
+            </div>
+        </div>
+    </main>
+
+    <!-- 底部懸浮控制列 -->
+    <footer class="absolute bottom-6 left-0 right-0 z-40 flex justify-center px-4 pointer-events-none">
+        <div class="glass-panel px-4 py-3 rounded-2xl flex items-center space-x-3 pointer-events-auto shadow-2xl max-w-md w-full justify-around">
+            <!-- 自動旋轉開關 -->
+            <button id="toggle-rotate-btn" class="flex flex-col items-center space-y-1 text-slate-300 hover:text-white transition group">
+                <div class="w-9 h-9 rounded-xl bg-white/5 group-hover:bg-white/15 flex items-center justify-center transition">
+                    <i id="rotate-icon" class="fa-solid fa-arrows-spin text-blue-400"></i>
+                </div>
+                <span id="rotate-btn-text" class="text-[10px] font-medium">旋轉: 開</span>
+            </button>
+
+            <!-- 重設視角 -->
+            <button id="reset-view-btn" class="flex flex-col items-center space-y-1 text-slate-300 hover:text-white transition group">
+                <div class="w-9 h-9 rounded-xl bg-white/5 group-hover:bg-white/15 flex items-center justify-center transition">
+                    <i class="fa-solid fa-compress text-indigo-400"></i>
+                </div>
+                <span class="text-[10px] font-medium">重設視角</span>
+            </button>
+
+            <!-- 燈光模式切換 -->
+            <button id="toggle-env-btn" class="flex flex-col items-center space-y-1 text-slate-300 hover:text-white transition group">
+                <div class="w-9 h-9 rounded-xl bg-white/5 group-hover:bg-white/15 flex items-center justify-center transition">
+                    <i class="fa-solid fa-sun text-amber-400"></i>
+                </div>
+                <span class="text-[10px] font-medium">切換燈光</span>
+            </button>
+
+            <!-- AR 擴增實境按鈕 -->
+            <button id="trigger-ar-btn" class="flex flex-col items-center space-y-1 text-white transition group">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 group-hover:scale-105 transition">
+                    <i class="fa-solid fa-cube text-white"></i>
+                </div>
+                <span class="text-[10px] font-medium text-blue-300">AR 實境</span>
+            </button>
+        </div>
     </footer>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            /* 取得 DOM 元素 */
-            const modelViewer = document.getElementById('studio-viewer');
+            const modelViewer = document.getElementById('3d-viewer');
             const loadingOverlay = document.getElementById('loading-overlay');
             const progressBar = document.getElementById('progress-bar');
             const progressPercent = document.getElementById('progress-percent');
+            const loadingText = document.getElementById('loading-text');
             const toggleRotateBtn = document.getElementById('toggle-rotate-btn');
-            const rotateBtnText = document.getElementById('rotate-btn-text');
             const rotateIcon = document.getElementById('rotate-icon');
+            const rotateBtnText = document.getElementById('rotate-btn-text');
             const resetViewBtn = document.getElementById('reset-view-btn');
             const triggerArBtn = document.getElementById('trigger-ar-btn');
             const customArBtn = document.getElementById('custom-ar-btn');
             const statusBadge = document.getElementById('status-badge');
+            const dropZone = document.getElementById('drop-zone');
+            const dragOverlay = document.getElementById('drag-overlay');
+            const glbFileInput = document.getElementById('glb-file-input');
+            const infoPanel = document.getElementById('info-panel');
+            const toggleInfoBtn = document.getElementById('toggle-info-btn');
+            const closeInfoBtn = document.getElementById('close-info-btn');
+            const modelNameText = document.getElementById('model-name-text');
+            const modelInfoBadge = document.getElementById('model-info-badge');
+            const toggleEnvBtn = document.getElementById('toggle-env-btn');
 
-            // 狀態變數：紀錄使用者設定的自動旋轉偏好
+            /* Material controls */
+            const matColor = document.getElementById('mat-color');
+            const matRoughness = document.getElementById('mat-roughness');
+            const matMetallic = document.getElementById('mat-metallic');
+            const roughnessVal = document.getElementById('roughness-val');
+            const metallicVal = document.getElementById('metallic-val');
+
             let isAutoRotateEnabled = true;
+            let currentEnvIndex = 0;
+            const envPresets = ['neutral', 'legacy', 'spruit_sunrise_1k_HDR.hdr'];
 
-            /* 1. 模型載入進度處理 (Progress Event) */
+            /* 1. 載入進度條與錯誤處理 */
             modelViewer.addEventListener('progress', (event) => {
                 const progress = event.detail.totalProgress;
                 const percent = Math.round(progress * 100);
-                
                 progressBar.style.width = `${percent}%`;
                 progressPercent.textContent = `${percent}%`;
 
-                // 載入完成，將 Loading 畫面淡出隱藏
                 if (progress === 1) {
                     setTimeout(() => {
                         loadingOverlay.classList.add('fade-out');
                         setTimeout(() => {
                             loadingOverlay.style.display = 'none';
-                        }, 600);
-                    }, 300);
+                        }, 500);
+                    }, 200);
                 }
             });
 
-            /* 2. 切換自動旋轉 (Auto-Rotate Toggle) */
+            modelViewer.addEventListener('error', (event) => {
+                console.warn("模型載入受阻，嘗試恢復預設模型...", event);
+                loadingText.textContent = "載入示範 3D 模型中...";
+            });
+
+            /* 2. GLB 檔案上傳與拖曳處理 (File Import & Drag-Drop) */
+            function loadGlbFile(file) {
+                if (!file || (!file.name.endsWith('.glb') && !file.name.endsWith('.gltf'))) {
+                    showNotification('請選擇有效的 .glb 或 .gltf 3D 模型檔案');
+                    return;
+                }
+
+                loadingOverlay.style.display = 'flex';
+                loadingOverlay.classList.remove('fade-out');
+                loadingText.textContent = `讀取 ${file.name}...`;
+
+                const blobUrl = URL.createObjectURL(file);
+                modelViewer.src = blobUrl;
+
+                modelNameText.textContent = file.name;
+                modelInfoBadge.classList.remove('hidden');
+
+                // 解析 glTF metadata
+                parseGltfMetadata(file);
+            }
+
+            glbFileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    loadGlbFile(e.target.files[0]);
+                }
+            });
+
+            // 拖曳上傳支援
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dragOverlay.classList.remove('opacity-0', 'pointer-events-none');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dragOverlay.classList.add('opacity-0', 'pointer-events-none');
+                }, false);
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length > 0) {
+                    loadGlbFile(files[0]);
+                }
+            });
+
+            /* 3. 解析 GLB JSON Metadata */
+            function parseGltfMetadata(file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const buffer = e.target.result;
+                        const dataView = new DataView(buffer);
+                        // Check glTF binary header
+                        const magic = dataView.getUint32(0, true);
+                        if (magic === 0x46546C67) { // 'glTF'
+                            const jsonChunkLength = dataView.getUint32(12, true);
+                            const jsonChunkType = dataView.getUint32(16, true);
+                            if (jsonChunkType === 0x4E4F534A) { // 'JSON'
+                                const jsonText = new TextDecoder('utf-8').decode(new Uint8Array(buffer, 20, jsonChunkLength));
+                                const gltfJson = JSON.parse(jsonText);
+                                updateInfoPanelUI(gltfJson);
+                            }
+                        }
+                    } catch (err) {
+                        console.log("解析 GLB 標頭資訊中...", err);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            function updateInfoPanelUI(gltf) {
+                if (gltf.asset && gltf.asset.generator) {
+                    document.getElementById('meta-generator').textContent = gltf.asset.generator;
+                }
+                if (gltf.nodes && gltf.nodes[0] && gltf.nodes[0].name) {
+                    document.getElementById('meta-node').textContent = gltf.nodes[0].name;
+                }
+                if (gltf.materials && gltf.materials[0]) {
+                    const mat = gltf.materials[0];
+                    if (mat.pbrMetallicRoughness) {
+                        const pbr = mat.pbrMetallicRoughness;
+                        if (pbr.roughnessFactor !== undefined) {
+                            matRoughness.value = pbr.roughnessFactor;
+                            roughnessVal.textContent = pbr.roughnessFactor;
+                        }
+                        if (pbr.metallicFactor !== undefined) {
+                            matMetallic.value = pbr.metallicFactor;
+                            metallicVal.textContent = pbr.metallicFactor;
+                        }
+                    }
+                }
+            }
+
+            /* 4. 自動旋轉與燈光模式控制 */
             function updateRotateUI(enabled) {
                 if (enabled) {
                     modelViewer.autoRotate = true;
-                    toggleRotateBtn.classList.add('active');
-                    rotateBtnText.textContent = '自動旋轉：開';
+                    rotateBtnText.textContent = '旋轉: 開';
                     rotateIcon.classList.add('animate-spin');
-                    rotateIcon.style.animationDuration = '8s';
+                    rotateIcon.style.animationDuration = '10s';
                 } else {
                     modelViewer.autoRotate = false;
-                    toggleRotateBtn.classList.remove('active');
-                    rotateBtnText.textContent = '自動旋轉：關';
+                    rotateBtnText.textContent = '旋轉: 關';
                     rotateIcon.classList.remove('animate-spin');
                 }
             }
@@ -252,45 +370,74 @@
                 updateRotateUI(isAutoRotateEnabled);
             });
 
-            /* 3. 手指觸控時暫停自動旋轉 / 離開後自動恢復 */
-            // 當使用者觸控操作模型時 (camera-change & user interaction)
-            modelViewer.addEventListener('camera-change', (event) => {
-                if (event.detail.source === 'user-interaction') {
-                    statusBadge.textContent = '手勢操作中...';
-                    statusBadge.classList.add('bg-white/20', 'text-white');
-                }
+            toggleEnvBtn.addEventListener('click', () => {
+                currentEnvIndex = (currentEnvIndex + 1) % envPresets.length;
+                modelViewer.environmentImage = envPresets[currentEnvIndex];
+                showNotification(`切換燈光模式: ${envPresets[currentEnvIndex]}`);
             });
 
-            // 手指離開螢幕，恢復偏好的自動旋轉模式
-            const handleTouchEnd = () => {
-                setTimeout(() => {
-                    statusBadge.textContent = '攝影棚模式';
-                    statusBadge.classList.remove('bg-white/20', 'text-white');
-                }, 1000);
-            };
-
-            modelViewer.addEventListener('touchend', handleTouchEnd);
-            modelViewer.addEventListener('mouseup', handleTouchEnd);
-
-            /* 4. 重設攝影機視角 */
             resetViewBtn.addEventListener('click', () => {
                 modelViewer.cameraOrbit = '0deg 75deg 105%';
+                modelViewer.cameraTarget = 'auto auto auto';
                 modelViewer.fieldOfView = 'auto';
-                modelViewer.jumpToGoal();
             });
 
-            /* 5. 觸發 iPhone Apple AR Quick Look */
+            /* 5. AR 啟動與資訊面板開關 */
             triggerArBtn.addEventListener('click', () => {
-                // 呼叫 model-viewer 的 activateAR 方法或點擊隱藏的 slot 觸發器
                 if (modelViewer.canActivateAR) {
                     modelViewer.activateAR();
                 } else {
-                    // 若是在非 iOS / 無 AR 支援的環境下提示
                     customArBtn.click();
                 }
             });
 
-            /* 初始化狀態 */
+            let isInfoOpen = false;
+            function toggleInfoPanel() {
+                isInfoOpen = !isInfoOpen;
+                if (isInfoOpen) {
+                    infoPanel.classList.remove('translate-x-96', 'opacity-0', 'pointer-events-none');
+                } else {
+                    infoPanel.classList.add('translate-x-96', 'opacity-0', 'pointer-events-none');
+                }
+            }
+
+            toggleInfoBtn.addEventListener('click', toggleInfoPanel);
+            closeInfoBtn.addEventListener('click', toggleInfoPanel);
+
+            /* 6. 即時材質動態調色板 */
+            modelViewer.addEventListener('load', () => {
+                statusBadge.textContent = '3D 攝影棚 Ready';
+                const material = modelViewer.model && modelViewer.model.materials[0];
+                if (!material) return;
+
+                matColor.addEventListener('input', (e) => {
+                    const hex = e.target.value;
+                    const r = parseInt(hex.slice(1, 3), 16) / 255;
+                    const g = parseInt(hex.slice(3, 5), 16) / 255;
+                    const b = parseInt(hex.slice(5, 7), 16) / 255;
+                    material.pbrMetallicRoughness.setBaseColorFactor([r, g, b, 1.0]);
+                });
+
+                matRoughness.addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    roughnessVal.textContent = val;
+                    material.pbrMetallicRoughness.setRoughnessFactor(val);
+                });
+
+                matMetallic.addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    metallicVal.textContent = val;
+                    material.pbrMetallicRoughness.setMetallicFactor(val);
+                });
+            });
+
+            function showNotification(text) {
+                statusBadge.textContent = text;
+                setTimeout(() => {
+                    statusBadge.textContent = '3D 攝影棚 Ready';
+                }, 2500);
+            }
+
             updateRotateUI(true);
         });
     </script>
