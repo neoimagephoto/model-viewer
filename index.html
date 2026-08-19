@@ -2,8 +2,15 @@
 <html lang="zh-TW" class="h-full bg-slate-950 text-slate-100 font-sans antialiased">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>iPhone 3D AR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D AR Studio</title>
+    
+    <!-- iPhone Web App & PWA 圖示與設定 -->
+    <link rel="apple-touch-icon" sizes="180x180" href="AR(180x180).png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="3D AR Studio">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -24,28 +31,40 @@
             height: 100%;
             --poster-color: transparent;
         }
+        select option {
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
     </style>
 </head>
 <body class="h-full overflow-hidden flex flex-col justify-between relative bg-gradient-to-b from-slate-900 via-slate-950 to-black select-none">
 
     <!-- 頂部列 Header -->
-    <header class="absolute top-0 left-0 right-0 z-40 p-4 flex items-center justify-between pointer-events-none">
-        <div class="flex items-center space-x-3 pointer-events-auto">
+    <header class="absolute top-0 left-0 right-0 z-40 p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        <div class="flex items-center space-x-2 pointer-events-auto">
             <div class="glass-panel px-3 py-1.5 rounded-full flex items-center space-x-2 text-xs font-medium text-slate-200">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span id="status-badge">攝影棚模式</span>
             </div>
-            <div id="model-info-badge" class="hidden sm:flex glass-panel px-3 py-1.5 rounded-full items-center space-x-2 text-xs font-medium text-blue-400">
-                <i class="fa-solid fa-cube text-blue-400"></i>
-                <span id="model-name-text">Text.glb (Blender)</span>
+
+            <!-- 模型選單切換器 Model Selector -->
+            <div class="glass-panel rounded-full px-2 py-1 flex items-center space-x-1 text-xs text-slate-200">
+                <i class="fa-solid fa-cubes text-indigo-400 ml-1"></i>
+                <select id="model-select" class="bg-transparent border-none text-xs font-medium focus:outline-none text-white cursor-pointer pr-1">
+                    <option value="https://modelviewer.dev/shared-assets/models/Astronaut.glb" selected>👨‍🚀 太空人 (預設)</option>
+                    <option value="https://modelviewer.dev/shared-assets/models/glTF-Sample-Assets/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb">🪖 復古科幻頭盔</option>
+                    <option value="https://modelviewer.dev/shared-assets/models/RobotExpressive.glb">🤖 機器人</option>
+                    <option value="https://modelviewer.dev/shared-assets/models/Chair.glb">🪑 現代單人椅</option>
+                </select>
             </div>
         </div>
 
         <div class="flex items-center space-x-2 pointer-events-auto">
             <!-- 檔案上傳按鈕 -->
-            <label class="glass-panel px-3 py-2 rounded-xl text-xs font-medium text-white hover:bg-white/20 active:scale-95 transition cursor-pointer flex items-center space-x-2">
+            <label class="glass-panel px-3 py-2 rounded-xl text-xs font-medium text-white hover:bg-white/20 active:scale-95 transition cursor-pointer flex items-center space-x-1.5">
                 <i class="fa-solid fa-file-arrow-up text-blue-400"></i>
-                <span>載入 GLB 模型</span>
+                <span class="hidden sm:inline">匯入 GLB 模型</span>
+                <span class="sm:hidden">匯入</span>
                 <input type="file" id="glb-file-input" accept=".glb,.gltf" class="hidden">
             </label>
             <!-- 資訊面板切換按鈕 -->
@@ -77,7 +96,7 @@
             shadow-intensity="1.5"
             shadow-softness="0.8"
             exposure="1.1"
-            environment-image="neutral"
+            environment-image="spruit_sunrise_1k_hdr.hdr"
             interaction-prompt="auto">
             
             <button slot="ar-button" id="custom-ar-btn" class="hidden"></button>
@@ -97,16 +116,16 @@
 
             <div class="space-y-2.5 text-xs">
                 <div class="flex justify-between py-1 border-b border-white/5">
+                    <span class="text-slate-400">當前模型 (Model):</span>
+                    <span id="model-name-text" class="font-mono text-blue-400 truncate max-w-[140px]">Astronaut.glb</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
                     <span class="text-slate-400">產生器 (Generator):</span>
-                    <span id="meta-generator" class="font-mono text-slate-200 truncate max-w-[140px]" title="Khronos glTF Blender I/O">Blender v5.2.39</span>
+                    <span id="meta-generator" class="font-mono text-slate-200 truncate max-w-[140px]" title="Khronos glTF">Khronos glTF</span>
                 </div>
                 <div class="flex justify-between py-1 border-b border-white/5">
                     <span class="text-slate-400">網格名稱 (Node):</span>
-                    <span id="meta-node" class="font-mono text-amber-400 font-semibold">Text</span>
-                </div>
-                <div class="flex justify-between py-1 border-b border-white/5">
-                    <span class="text-slate-400">材質雙面 (Double Sided):</span>
-                    <span id="meta-doublesided" class="font-mono text-emerald-400">True (雙面繪製)</span>
+                    <span id="meta-node" class="font-mono text-amber-400 font-semibold">Mesh</span>
                 </div>
 
                 <!-- 材質即時微調 Slider Controls -->
@@ -119,7 +138,7 @@
                         <div>
                             <div class="flex justify-between text-[11px] text-slate-400 mb-1">
                                 <span>基礎顏色 (Base Color)</span>
-                                <input type="color" id="mat-color" value="#ff9a00" class="w-5 h-5 rounded cursor-pointer border-none bg-transparent">
+                                <input type="color" id="mat-color" value="#ffffff" class="w-5 h-5 rounded cursor-pointer border-none bg-transparent">
                             </div>
                         </div>
                         <div>
@@ -215,8 +234,11 @@
             const toggleInfoBtn = document.getElementById('toggle-info-btn');
             const closeInfoBtn = document.getElementById('close-info-btn');
             const modelNameText = document.getElementById('model-name-text');
-            const modelInfoBadge = document.getElementById('model-info-badge');
             const toggleEnvBtn = document.getElementById('toggle-env-btn');
+            const modelSelect = document.getElementById('model-select');
+
+            /* 依指示設定指定的 HDR 環境照明檔案 */
+            modelViewer.setAttribute('environment-image', 'spruit_sunrise_1k_hdr.hdr');
 
             /* Material controls */
             const matColor = document.getElementById('mat-color');
@@ -227,7 +249,7 @@
 
             let isAutoRotateEnabled = true;
             let currentEnvIndex = 0;
-            const envPresets = ['neutral', 'legacy', 'spruit_sunrise_1k_HDR.hdr'];
+            const envPresets = ['spruit_sunrise_1k_hdr.hdr', 'neutral', 'legacy'];
 
             /* 1. 載入進度條與錯誤處理 */
             modelViewer.addEventListener('progress', (event) => {
@@ -247,26 +269,43 @@
             });
 
             modelViewer.addEventListener('error', (event) => {
-                console.warn("模型載入受阻，嘗試恢復預設模型...", event);
-                loadingText.textContent = "載入示範 3D 模型中...";
+                console.warn("模型載入受阻，可切換選單中的其他模型...", event);
+                loadingText.textContent = "請選擇其他 3D 模型...";
             });
 
-            /* 2. GLB 檔案上傳與拖曳處理 (File Import & Drag-Drop) */
+            /* 2. 切換選單模型 (Model Switching) */
+            modelSelect.addEventListener('change', (e) => {
+                const selectedSrc = e.target.value;
+                const selectedText = e.target.options[e.target.selectedIndex].text;
+                switchModelSource(selectedSrc, selectedText);
+            });
+
+            function switchModelSource(srcUrl, displayName) {
+                loadingOverlay.style.display = 'flex';
+                loadingOverlay.classList.remove('fade-out');
+                loadingText.textContent = `載入 ${displayName || '模型'}...`;
+                modelViewer.src = srcUrl;
+                modelNameText.textContent = displayName || srcUrl.split('/').pop();
+            }
+
+            /* 3. GLB 檔案匯入與動態加入選單 (Import & Dynamic Option) */
             function loadGlbFile(file) {
                 if (!file || (!file.name.endsWith('.glb') && !file.name.endsWith('.gltf'))) {
                     showNotification('請選擇有效的 .glb 或 .gltf 3D 模型檔案');
                     return;
                 }
 
-                loadingOverlay.style.display = 'flex';
-                loadingOverlay.classList.remove('fade-out');
-                loadingText.textContent = `讀取 ${file.name}...`;
-
                 const blobUrl = URL.createObjectURL(file);
-                modelViewer.src = blobUrl;
+                const optionText = `📁 ${file.name}`;
 
-                modelNameText.textContent = file.name;
-                modelInfoBadge.classList.remove('hidden');
+                // 新增至選單並選取
+                const newOption = document.createElement('option');
+                newOption.value = blobUrl;
+                newOption.textContent = optionText;
+                newOption.selected = true;
+                modelSelect.appendChild(newOption);
+
+                switchModelSource(blobUrl, file.name);
 
                 // 解析 glTF metadata
                 parseGltfMetadata(file);
@@ -303,14 +342,13 @@
                 }
             });
 
-            /* 3. 解析 GLB JSON Metadata */
+            /* 4. 解析 GLB JSON Metadata */
             function parseGltfMetadata(file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     try {
                         const buffer = e.target.result;
                         const dataView = new DataView(buffer);
-                        // Check glTF binary header
                         const magic = dataView.getUint32(0, true);
                         if (magic === 0x46546C67) { // 'glTF'
                             const jsonChunkLength = dataView.getUint32(12, true);
@@ -351,7 +389,7 @@
                 }
             }
 
-            /* 4. 自動旋轉與燈光模式控制 */
+            /* 5. 自動旋轉與燈光模式控制 */
             function updateRotateUI(enabled) {
                 if (enabled) {
                     modelViewer.autoRotate = true;
@@ -372,8 +410,8 @@
 
             toggleEnvBtn.addEventListener('click', () => {
                 currentEnvIndex = (currentEnvIndex + 1) % envPresets.length;
-                modelViewer.environmentImage = envPresets[currentEnvIndex];
-                showNotification(`切換燈光模式: ${envPresets[currentEnvIndex]}`);
+                modelViewer.setAttribute('environment-image', envPresets[currentEnvIndex]);
+                showNotification(`切換燈光: ${envPresets[currentEnvIndex]}`);
             });
 
             resetViewBtn.addEventListener('click', () => {
@@ -382,7 +420,7 @@
                 modelViewer.fieldOfView = 'auto';
             });
 
-            /* 5. AR 啟動與資訊面板開關 */
+            /* 6. AR 啟動與資訊面板開關 */
             triggerArBtn.addEventListener('click', () => {
                 if (modelViewer.canActivateAR) {
                     modelViewer.activateAR();
@@ -404,7 +442,7 @@
             toggleInfoBtn.addEventListener('click', toggleInfoPanel);
             closeInfoBtn.addEventListener('click', toggleInfoPanel);
 
-            /* 6. 即時材質動態調色板 */
+            /* 7. 即時材質動態調色板 */
             modelViewer.addEventListener('load', () => {
                 statusBadge.textContent = '3D 攝影棚 Ready';
                 const material = modelViewer.model && modelViewer.model.materials[0];
